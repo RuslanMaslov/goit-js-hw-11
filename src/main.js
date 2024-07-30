@@ -1,33 +1,50 @@
-import { fetchImages } from './js/pixabay-api';
-import { renderImages, showError } from './js/render-functions';
+import iziToast from "izitoast";
+import "izitoast/dist/css/iziToast.min.css";
 
-const searchForm = document.getElementById('searchForm');
-const searchQuery = document.getElementById('searchQuery');
-const gallery = document.getElementById('gallery');
-const loader = document.getElementById('loader');
+import SimpleLightbox from "simplelightbox";
+import "simplelightbox/dist/simple-lightbox.min.css";
 
-searchForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  const query = searchQuery.value.trim();
-  if (query === '') {
-    showError('Search query cannot be empty');
-    return;
-  }
+import { renderPictures } from "./js/render-functions";
+import { generateHttpsQuery, fetchPictures } from "./js/pixabay-api";
 
-  gallery.innerHTML = '';
-  loader.style.display = 'block';
-
-  try {
-    const data = await fetchImages(query);
-    loader.style.display = 'none';
-    if (data.hits.length === 0) {
-      showError('Sorry, there are no images matching your search query. Please try again!');
-    } else {
-      renderImages(data.hits);
-    }
-  } catch (error) {
-    loader.style.display = 'none';
-    console.error('Error fetching images:', error);
-    showError('An error occurred while fetching images');
-  }
+const lightbox = new SimpleLightbox('.gallery a', {
+    captionDelay: 250,
+    captionPosition: "bottom",
+    captionsData: "alt"
 });
+
+const refs = {
+    searchForm: document.querySelector(".js-search-form"),
+    gallery: document.querySelector(".js-gallery"),
+    loader: document.querySelector(".js-loader"),
+};
+
+refs.searchForm.addEventListener("submit", handlerSubmit);
+
+function handlerSubmit(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const formValue = form.elements.searchtext.value.toLowerCase().trim();
+    refs.gallery.innerHTML = "";
+    refs.loader.classList.add("loader");
+    fetchPictures(generateHttpsQuery(formValue))
+        .then((data) => {
+            refs.loader.classList.remove("loader");
+            const hits = data.hits;
+            if (hits.length === 0) {
+                fetchError();
+            } 
+            refs.gallery.insertAdjacentHTML("beforeend", renderPictures(hits));
+            lightbox.refresh();
+        })
+        .catch(fetchError)
+        .finally(refs.searchForm.reset());
+}
+
+function fetchError(error) {
+    iziToast.error({
+        title: "Error",
+        message: "Sorry, there are no images matching your search query. Please try again!",
+    });
+}
